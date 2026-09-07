@@ -1,0 +1,20 @@
+# 依赖与构建产物
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+
+# Python
+backend/__pycache__/
+backend/*.pyc
+backend/.venv/
+.venv/
+
+# 环境与日志
+.env
+.env.*
+*.log
+.DS_Store
+
+.vscode/
+
+# 注意：backend/air_quality.db 只含演示数据、无敏感信息，需保留在仓库中，因此不忽略
