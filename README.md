@@ -22,9 +22,16 @@
 ```
 air-quality-vue-dashboard-pro/
 ├── backend/
-│   ├── app.py            # Flask 服务（/api/* 统一前缀、统一响应结构、全局异常处理）
-│   ├── air_quality.db    # SQLite 演示数据库（自动初始化，请保留）
+│   ├── app.py                # Flask 服务（HTTP 层：/api/* 前缀、统一响应、全局异常处理）
+│   ├── air_quality_core.py   # 纯业务逻辑：建库、演示数据生成、聚合查询（不依赖 Flask）
+│   ├── air_quality.db        # SQLite 演示数据库（自动初始化，请保留）
 │   └── requirements.txt
+├── netlify/
+│   ├── functions/api.mjs     # 线上版 /api/* 接口（Netlify Function）
+│   └── data/                 # 构建期生成的快照，已被 .gitignore 忽略
+├── scripts/
+│   └── export_snapshot.py    # 构建期把数据导出为函数可 import 的 JS 模块
+├── netlify.toml              # Netlify 构建设置与 /api/* 重写规则
 └── frontend/
     ├── src/
     │   ├── api/          # Axios 统一封装（baseURL: /api + 请求/响应拦截器）
@@ -38,6 +45,9 @@ air-quality-vue-dashboard-pro/
     ├── tsconfig.json
     └── vite.config.ts    # dev server proxy: /api -> http://127.0.0.1:5000
 ```
+
+> `air_quality_core.py` 是业务逻辑的唯一来源：本地 Flask 服务与 Netlify 构建脚本
+> 都复用它，所以两边的数据口径不会跑偏。
 
 ## 运行方式
 
@@ -94,8 +104,59 @@ npm run build
 
 产物输出到 `frontend/dist/`。
 
+## 部署到 Netlify
+
+### 为什么不是直接部署 Flask
+
+Netlify Functions **不支持 Python 运行时**，只支持 JavaScript / TypeScript / Go；Python 只能在
+构建阶段使用。因此线上架构是：
+
+```
+构建阶段（Python 可用）
+  scripts/export_snapshot.py
+    用固定种子重新生成演示数据（日期窗口锚定构建当天）
+    -> 跑完聚合逻辑
+    -> 产出 netlify/data/snapshot.mjs
+
+运行阶段（Netlify Function, JS）
+  GET /api/health
+  GET /api/cities
+  GET /api/dashboard_data?city=北京     <- 由 netlify.toml 从 /api/* 重写过来
+```
+
+接口的响应结构与 `backend/app.py` 完全一致，所以**前端代码一行都不用改**
+（`http.ts` 里的 `baseURL: '/api'` 在开发和生产下都成立）。
+
+副作用是趋势图每天都是"最近 14 天"，不会随仓库里那份数据一起变旧。
+
+### 部署步骤
+
+1. 把改动推到 GitHub。
+2. 打开 [Netlify](https://app.netlify.com) → **Add new site** → **Import an existing project** →
+   选 GitHub 仓库。
+3. 构建设置**留空即可**：仓库根目录的 `netlify.toml` 已经写好
+   （build command、publish 目录、Node 版本、`/api/*` 重写规则）。
+4. 点 Deploy。之后每次 push 到默认分支都会自动重新部署。
+
+### 本地预览线上形态
+
+```bash
+# 生成函数需要的快照（用哪个 Python 都行，脚本只依赖标准库）
+backend/.venv/Scripts/python.exe scripts/export_snapshot.py   # Windows
+python3 scripts/export_snapshot.py                            # macOS / Linux
+
+npx netlify-cli dev      # 本地起一个和线上一致的站点
+```
+
+> Netlify 构建机上 `python3` 直接可用（`netlify.toml` 里已声明 `PYTHON_VERSION`）。
+> Windows 本地如果没有全局 Python，用上面 venv 里的解释器即可。
+
+`netlify/data/` 是构建产物，已被 `.gitignore` 忽略，所以本地跑 `netlify dev` 前必须先执行导出脚本。
+
 ## 说明
 
 - `backend/air_quality.db` 仅包含演示数据（城市 AQI 模拟数据），无敏感信息，请保留在仓库中保证开箱即用。
+  它是**本地开发**的数据源；线上数据由构建脚本按固定种子重新生成。
 - 中国地图 GeoJSON 运行时从阿里云 DataV 在线加载，若加载失败会自动降级为散点视图。
-- 数据源替换：将 `backend/app.py` 中 `init_db()` 的演示数据逻辑替换为你的爬虫写入逻辑即可。
+- 数据源替换：将 `backend/air_quality_core.py` 中 `generate_rows()` 的演示数据逻辑替换为你的
+  爬虫写入逻辑即可，Flask 与 Netlify 两侧会同时生效。

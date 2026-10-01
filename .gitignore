@@ -9,6 +9,9 @@ backend/*.pyc
 backend/.venv/
 .venv/
 
+# Netlify 构建产物（由 scripts/export_snapshot.py 生成）
+netlify/data/
+
 # 环境与日志
 .env
 .env.*

@@ -1,0 +1,25 @@
+# Netlify 部署配置
+#
+# 仓库结构：frontend/ 是 Vue 前端，backend/ 是本地开发用的 Flask 服务。
+# Netlify 不跑 Python 常驻服务，线上接口由 netlify/functions/api.mjs 提供：
+# 构建阶段 scripts/export_snapshot.py 先把数据算好导出成快照，
+# 运行时函数只做查表返回，接口契约与 Flask 完全一致。
+
+[build]
+  command = "npm --prefix frontend ci && npm --prefix frontend run build && python3 scripts/export_snapshot.py"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # 显式声明，确保构建镜像里 python3 可用（导出脚本只用到标准库）
+  PYTHON_VERSION = "3.11"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# 把 /api/* 交给函数处理，前端代码里的 baseURL: '/api' 无需改动
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
