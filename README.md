@@ -3,7 +3,7 @@
 前后端分离的空气质量数据看板。23 个城市、7 项指标（AQI / PM2.5 / PM10 / SO₂ / NO₂ / CO / O₃）、
 近 7 日趋势，覆盖「看数 → 筛选 → 定位」完整链路。
 
-**在线演示**：https://magical-crisp-96eb78.netlify.app　|　
+**在线演示**：https://air-quality-dashboard-dimple667.netlify.app/　|　
 **源码**：https://github.com/Dimple667/air-quality-dashboard-pro
 
 ![看板预览](docs/dashboard.png)
